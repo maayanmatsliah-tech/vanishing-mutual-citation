@@ -22,25 +22,3 @@ into an on-disk DuckDB; raw `data/` is not committed.
 pip install boto3 duckdb matplotlib requests
 python3 build_tables_from_snapshot.py
 ```
-
-## Structure
-
-```
-├── build_tables_from_snapshot.py   # ingest OpenAlex snapshot -> local tables
-├── analyze_mutual_by_diversity.py  # top-level mutual-by-diversity analysis
-├── analysis/                       # pipeline: find mutual pairs, diversity, plots
-├── research/                       # current-hypothesis scripts (per-year, significance)
-├── docs/                           # findings and write-up
-├── data/                           # local DuckDB + CSVs (not committed)
-└── outputs/                        # saved charts + their source CSVs
-```
-
-## Outputs
-
-- `outputs/mutual_citation_rate/rate_by_diversity.png` — mutual-citation rate
-  (% of citations reciprocated) by year, per diversity group.
-- `outputs/mutual_paper_share/share_by_diversity.png` — share of papers with
-  any mutual citation by year, per diversity group.
-
-Both exclude diversity group 0 and (year, group) cells with fewer than 10K
-papers. Each PNG sits next to the CSV it was generated from.
