@@ -20,7 +20,7 @@ reciprocate up to 83% more than non-diverse papers, not less.
 ## Data
 
 Source: [OpenAlex](https://openalex.org/) — public, no account needed
-(S3 snapshot for older papers, API for recent years). Tables are built
+(S3 snapshot). Tables are built
 locally into an on-disk DuckDB; raw `data/` is not committed.
 
 ```bash
