@@ -1,28 +1,27 @@
 """
-Validate the collected snapshot (attributes.csv + edges.csv) before any research.
+STEP 2: Validate the collected snapshot (attributes.csv + edges.csv) before any research.
+Read-only, no outputs consumed downstream. See ATTR/EDGES env vars.
 
 Tiers 1 & 2:
-  T1 completeness      every bucket part is in the checkpoint (nothing skipped)
-  T1 row parity        DuckDB's logical row count matches the csv-reader count
-  T1 id/year validity  ids parse as W+digits; years all within [START,END], none null
-  T1 referential       every edges.source exists in attributes
-  T1 zero-citation     how many papers have no outbound citations
-  T1 target coverage   fraction of the ~2B citations whose target's field we know
-  T2 structural        malformed/rejected rows in either file
-  T2 edges shape       one row per source; self-loops; duplicate targets within a list
-  T2 field domain      distinct fields, "Unknown" share, null fields
+    T1 completeness      every bucket part is in the checkpoint (nothing skipped)
+    T1 row parity        DuckDB's logical row count matches the csv-reader count
+    T1 id/year validity  ids parse as W+digits; years all within [START,END], none null
+    T1 referential       every edges.source exists in attributes
+    T1 zero-citation     how many papers have no outbound citations
+    T1 target coverage   fraction of the ~2B citations whose target's field we know
+    T2 structural        malformed/rejected rows in either file
+    T2 edges shape       one row per source; self-loops; duplicate targets within a list
+    T2 field domain      distinct fields, "Unknown" share, null fields
 
-Storage policy: on-disk DuckDB (db file + temp dir on disk), memory_limit caps RAM.
-Reads the CSVs directly; nothing in the CSVs is modified.
 
 Env:
-  ATTR/EDGES   CSV paths            (default data/attributes.csv, data/edges.csv)
-  PROGRESS     checkpoint tsv       (default data/.snapshot_progress.tsv)
-  VALDB        scratch db path      (default data/_validate.duckdb)
-  DUCKDB_TMP   spill dir            (default data/_duckdb_tmp)
-  MEM          memory_limit         (default 16GB)
-  START/END    expected year bounds (default 1975 / 2025)
-  EXPECT_ROWS  known csv-reader row count for parity (default 413392893)
+    ATTR/EDGES   CSV paths            (default data/attributes.csv, data/edges.csv)
+    PROGRESS     checkpoint tsv       (default data/.snapshot_progress.tsv)
+    VALDB        scratch db path      (default data/_validate.duckdb)
+    DUCKDB_TMP   spill dir            (default data/_duckdb_tmp)
+    MEM          memory_limit         (default 16GB)
+    START/END    expected year bounds (default 1975 / 2025)
+    EXPECT_ROWS  known csv-reader row count for parity (default 413392893)
 """
 
 import os
