@@ -1,48 +1,13 @@
 #!/usr/bin/env python3
 """
-Reference-count decile analysis with value-based bins.
+Reference-count decile analysis comparing diverse (diversity >= 3) vs non-diverse (1-2) papers.
 
 Cohort:
-  Papers with n_cited >= 3 AND published in [MIN_YEAR, MAX_YEAR] (default
-  1975-2023).
-
-  The 2023 cap matters: cleaning only dropped field='Unknown', so ~15.5M
-  papers dated 2024-2025 survive in attributes.duckdb with a real field.
-  Uncapped they were 12.9% of this cohort, and they are heavily
-  right-censored -- a 2024/2025 paper contributes its full n_cited but its
-  reciprocal citations mostly postdate the snapshot, so n_mutual is
-  systematically depressed. That biases the mutual rate downward, and it
-  does so unevenly across deciles.
-
-  The deciles are computed AFTER this filter, so the bins describe the
-  analysed population rather than being inherited from a wider one.
-
-Decile definition:
-  Papers with the same n_cited value MUST remain in the same decile.
-
-  We therefore:
-    1. Count papers at each distinct n_cited value.
-    2. Treat each distinct n_cited value as an indivisible block.
-    3. Assign the block using the midpoint of its position in the
-       cumulative paper distribution.
-    4. Map that midpoint to deciles 1-10.
-
-  This produces approximately equal-sized deciles while ensuring that
-  identical n_cited values are never split across deciles.
-
-Diversity grouping:
-  diversity_count 1-2 -> non-diverse
-  diversity_count 3+  -> diverse
-  diversity_count 0   -> excluded
+  Papers with n_cited >= 3 and year in [MIN_YEAR, MAX_YEAR].
+  Deciles are midpoint-assigned on distinct n_cited values without splitting identical counts.
 
 Inputs:
-  data/_n_cited.csv
-  data/_n_mutual.csv
-  data/attributes.duckdb
-
-Env:
-  MIN_YEAR  default 1975
-  MAX_YEAR  default 2023
+  data/attributes.duckdb, data/_n_cited.csv, data/_n_mutual.csv
 
 Outputs:
   figures/csvs/refcount_decile_dvn_share.csv
@@ -50,7 +15,8 @@ Outputs:
   figures/graphs/refcount_decile_dvn_share.png
   figures/graphs/refcount_decile_dvn_rate.png
 
-The attributes database is opened READ_ONLY and is never modified.
+Env:
+  MIN_YEAR / MAX_YEAR  Year bounds (default: 1975 to 2023)
 """
 
 import os
