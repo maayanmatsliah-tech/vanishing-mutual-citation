@@ -22,14 +22,4 @@ pip install boto3 duckdb matplotlib requests numpy
 - `data_validation/` — Validation checks for snapshot completeness, schema invariants, and data integrity.
 - `figures/` — Plotting scripts, source CSV tables, and generated figures.
 
-## Citation
-
-If you use this code or pipeline, please cite the paper:
-
-```bibtex
-@article{vanishing_mutual_citation,
-  title={The Vanishing Mutual Citation},
-  author={...},
-  year={2026}
-}
 ```
