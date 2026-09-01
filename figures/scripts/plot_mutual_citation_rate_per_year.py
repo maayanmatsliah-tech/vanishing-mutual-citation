@@ -1,51 +1,23 @@
 #!/usr/bin/env python3
 """
-Mutual-citation rate by publication year.
-
-Uses the precomputed:
-  - data/_n_cited.csv
-  - data/_n_mutual.csv
-
-Cohort:
-  Papers with n_cited 1.
-
-For each year, the pooled mutual-citation rate is:
-
-    rate = 100 * sum(n_mutual) / sum(n_cited)
-
-Interpretation:
-  Of all citations made by papers in a given publication year,
-  what percentage are reciprocated?
-
-Definitions:
-  - n_cited  = precomputed number of distinct papers cited by a paper,
-               excluding self-citations.
-  - n_mutual = precomputed number of mutual-citation pairs a paper
-               belongs to. Each mutual pair contributes +1 to both papers.
-  - year     = publication year from attributes.duckdb.
-
-Important:
-  This script READS attributes.duckdb but never modifies it.
-  It does not recompute n_cited or n_mutual from the large raw files.
+Calculate and plot the mutual-citation rate by publication year:
+  rate = 100 * sum(n_mutual) / sum(n_cited) for papers with n_cited >= 1.
 
 Outputs:
   figures/csvs/mutual_citation_rate_per_year.csv
   figures/graphs/mutual_citation_rate_per_year.png
 
 Env:
-  ATTR       default data/attributes.duckdb
-  NCITED     default data/_n_cited.csv
-  NMUTUAL    default data/_n_mutual.csv
-  MEM        default 10GB
-  MIN_PAPERS default 10000
-  MIN_YEAR   default 1975
-  MAX_YEAR   default 2023
+  ATTR / NCITED / NMUTUAL  Input paths (default: data/attributes.duckdb, data/_n_cited.csv, data/_n_mutual.csv)
+  OUT_CSV / OUT_PNG        Output CSV and PNG plot paths
+  MEM                      DuckDB memory limit (default: 10GB)
+  MIN_PAPERS               Minimum papers per year to include (default: 10000)
+  MIN_YEAR / MAX_YEAR      Year range (default: 1975 to 2023)
 """
 
 import os
 
 import duckdb
-
 
 ATTR = os.environ.get("ATTR", "data/attributes.duckdb")
 NCITED = os.environ.get("NCITED", "data/_n_cited.csv")
@@ -86,8 +58,7 @@ def compute():
     # Only papers with n_cited 1 are part of the cohort.
     #
     # IDs in _n_cited.csv and _n_mutual.csv are already bare integers.
-    con.execute(
-        f"""
+    con.execute(f"""
         CREATE TEMP TABLE ncited AS
         SELECT
             CAST(id AS BIGINT) AS id,
@@ -98,12 +69,10 @@ def compute():
             all_varchar=true
         )
         WHERE CAST(n_cited AS BIGINT) >= 1
-        """
-    )
+        """)
 
     # Papers absent from _n_mutual.csv have zero mutual citations.
-    con.execute(
-        f"""
+    con.execute(f"""
         CREATE TEMP TABLE nmut AS
         SELECT
             CAST(id AS BIGINT) AS id,
@@ -113,13 +82,11 @@ def compute():
             header=true,
             all_varchar=true
         )
-        """
-    )
+        """)
 
     print("Joining to publication year and aggregating...", flush=True)
 
-    rows = con.execute(
-        f"""
+    rows = con.execute(f"""
         WITH per_paper AS (
             SELECT
                 att.year AS year,
@@ -142,8 +109,7 @@ def compute():
         FROM per_paper
         GROUP BY year
         ORDER BY year
-        """
-    ).fetchall()
+        """).fetchall()
 
     con.close()
 
@@ -211,8 +177,7 @@ def write_outputs(rows):
     ax.set_xlabel("Publication year")
     ax.set_ylabel("Mutual-citation rate (%)")
     ax.set_title(
-        "Mutual-citation rate by publication year\n"
-        "(papers citing ≥1 papers)"
+        "Mutual-citation rate by publication year\n" "(papers citing ≥1 papers)"
     )
 
     ax.grid(True, alpha=0.3)

@@ -1,52 +1,38 @@
 """
-Produce a CLEAN copy of the dataset by dropping non-paper records, then rebuild
-the mutual-citation pairs on the cleaned graph. One script, three stages, no
-hand-off to another file.
+Clean non-paper records (field='Unknown') and identify mutual citation pairs.
 
-Root cause (see docs / memory): the OpenAlex snapshot was ingested with NO
-work-type filter, so ~17.7M non-paper records (datasets, author-profile "other"
-records, paratext, peer-review) came in -- 94% of them dated 2024/2025. They
-all lack a topic, so they carry field='Unknown'. We can't filter by `type`
-(it was never stored), but `field='Unknown'` cleanly identifies this junk.
+Executes three sequential stages:
+  1. attributes: Filter out non-paper records (field='Unknown') from attributes.duckdb.
+  2. edges: Filter edges.csv to retain only rows where the citing source paper exists
+     in the cleaned attributes table.
+  3. pairs: Identify reciprocated mutual citation pairs on the cleaned citation graph
+     using partitioned batch processing to manage memory efficiently.
 
-Stages (originals are left untouched as backups):
-  1 attributes  data/attributes_clean.duckdb  attributes minus field='Unknown'
-  2 edges       data/edges_clean.csv          edges whose SOURCE survives (targets
-                                              kept intact, so the existing
-                                              diversity_count stays consistent)
-  3 pairs       data/mutual_pairs_clean.csv   mutual pairs on the clean graph; both
-                                              endpoints are guaranteed surviving
-                                              papers because the source-filter keeps
-                                              only targets that are themselves clean
-                                              sources
+Outputs are written to temporary files and atomically renamed upon completion to
+support resuming interrupted runs.
 
-Stage 3 reads the stage-2 output directly, so no intermediate rename is needed.
+Inputs:
+  data/attributes.duckdb
+  data/edges.csv
 
-WHY STAGE 3 IS BATCHED. It used to be a single COPY: unnest all ~2.9B citations
--> filter -> group by (least,greatest) -> keep pairs reciprocated in both
-directions. That always died with
-    OutOfMemoryError: failed to offload data block (54.7 GiB/54.7 GiB used)
-because the whole unnest had to be resident at once (see data/clean_dataset.log).
-Instead the unnest is materialized ONCE into a persistent table tagged
-`least(s,t) % N_BATCHES`, and each partition is grouped separately. Rows are
-grouped by (least,greatest) and partitioned on least(s,t), so every row of a
-given pair lands in the same batch -- the batches therefore concatenate to
-exactly the one-shot result, they are not an approximation.
+Outputs:
+  data/attributes_clean.duckdb
+  data/edges_clean.csv
+  data/mutual_pairs_clean.csv
 
-RESUME. Every stage skips itself if its output already exists, and stage 3
-additionally skips individual finished batches and reuses the materialized
-unnest. Delete an output to force that stage to rebuild. A run killed partway
-through the heavy unnest can simply be relaunched.
-
-Every output is built at <path>.tmp and atomically renamed into place on
-success, so "the file exists" always means "that stage finished". Without this
-a run killed mid-write would leave a truncated edges_clean.csv (or an empty
-attributes db) that every later run would silently accept as complete.
-
-Env: ATTR_IN, ATTR_OUT, EDGES_IN, EDGES_OUT, PAIRS_OUT, MUT_DB, BATCH_DIR,
-     N_BATCHES (default 20), MEM (default 12GB), PAIRS_MEM (default 4GB),
-     PAIRS_THREADS (default 2), STAGES (default all; comma-separated subset of
-     attributes,edges,pairs).
+Env:
+  ATTR_IN        Input attributes database (default: data/attributes.duckdb)
+  ATTR_OUT       Output cleaned attributes database (default: data/attributes_clean.duckdb)
+  EDGES_IN       Input edges CSV (default: data/edges.csv)
+  EDGES_OUT      Output cleaned edges CSV (default: data/edges_clean.csv)
+  PAIRS_OUT      Output mutual pairs CSV (default: data/mutual_pairs_clean.csv)
+  MUT_DB         Scratch database for pair computation (default: data/_mutual_clean.duckdb)
+  BATCH_DIR      Directory for pair partition batches (default: data/mutual_pairs_batches)
+  N_BATCHES      Number of partitions for pair extraction (default: 20)
+  MEM            DuckDB memory limit (default: 12GB)
+  PAIRS_MEM      DuckDB memory limit for pair processing (default: 4GB)
+  PAIRS_THREADS  DuckDB threads for pair processing (default: 2)
+  STAGES         Stages to run ('all' or comma-separated subset: attributes,edges,pairs)
 """
 
 import csv
@@ -119,8 +105,10 @@ def stage_attributes():
     n_keep = con.execute("SELECT count(*) FROM attributes").fetchone()[0]
     con.close()
     os.replace(tmp, ATTR_OUT)
-    print(f"    attributes: {n_orig:,} -> {n_keep:,}  (dropped {n_orig - n_keep:,})",
-          flush=True)
+    print(
+        f"    attributes: {n_orig:,} -> {n_keep:,}  (dropped {n_orig - n_keep:,})",
+        flush=True,
+    )
 
 
 def stage_edges():
@@ -251,8 +239,10 @@ def main():
     for path in (ATTR_OUT, EDGES_OUT, PAIRS_OUT):
         if os.path.exists(path):
             print(f"  {path}")
-    print(f"\n(the materialized unnest is left in {MUT_DB} for resume; "
-          f"delete it to reclaim the space)")
+    print(
+        f"\n(the materialized unnest is left in {MUT_DB} for resume; "
+        f"delete it to reclaim the space)"
+    )
 
 
 if __name__ == "__main__":

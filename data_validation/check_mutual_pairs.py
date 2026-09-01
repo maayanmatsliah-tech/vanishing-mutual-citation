@@ -1,6 +1,14 @@
+"""
+Validate mutual pairs referential integrity and field cleanliness.
+
+Checks:
+  1. Both endpoints (paper_a, paper_b) exist in attributes.duckdb.
+  2. No mutual pair touches a non-paper record (field='Unknown').
+"""
+
 import duckdb
 
-con = duckdb.connect('data/attributes.duckdb', read_only=True)
+con = duckdb.connect("data/attributes.duckdb", read_only=True)
 
 result = con.execute("""
     WITH pairs AS (
@@ -15,7 +23,9 @@ result = con.execute("""
     LEFT JOIN attributes a ON a.id = p.paper_a
     LEFT JOIN attributes b ON b.id = p.paper_b
 """).fetchone()
-print(f"total_pairs={result[0]:,}  paper_a_missing={result[1]:,}  paper_b_missing={result[2]:,}")
+print(
+    f"total_pairs={result[0]:,}  paper_a_missing={result[1]:,}  paper_b_missing={result[2]:,}"
+)
 
 result2 = con.execute("""
     WITH pairs AS (

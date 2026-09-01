@@ -2,32 +2,13 @@
 Validate precomputed _n_cited.csv and _n_mutual.csv.
 
 Checks:
-  1. Both output CSVs can be parsed.
-  2. IDs and values are valid and non-negative.
-  3. Reports row counts, min/max, and sums.
-  4. n_cited is independently recomputed from edges.csv and compared
-     against data/_n_cited.csv.
-  5. n_mutual invariant:
-       sum(n_mutual) == 2 * number of mutual pairs.
-     Each mutual pair contributes +1 to both papers.
-
-n_cited definition:
-  - Number of DISTINCT targets in each source's target list.
-  - Self-citation is excluded.
-  - Current edges.csv has no duplicate targets, but list_distinct is
-    retained so the definition remains explicit.
-
-The script streams the large output CSVs rather than loading them
-entirely into Python memory.
+  1. Parse validity, non-negative values, row counts, and summary sums.
+  2. n_cited parity against independent recomputation from edges.csv.
+  3. n_mutual invariant: sum(n_mutual) == 2 * count(mutual_pairs).
 
 Env:
-  NCITED       default data/_n_cited.csv
-  NMUTUAL      default data/_n_mutual.csv
-  EDGES        default data/edges.csv
-  PAIRS        default data/mutual_pairs.csv
-
-Usage:
-  python3 analysis/validate_n_cited_n_mutual.py
+  NCITED / NMUTUAL  Input metric CSVs (default: data/_n_cited.csv, data/_n_mutual.csv)
+  EDGES / PAIRS     Input edges / mutual pairs (default: data/edges.csv, data/mutual_pairs.csv)
 """
 
 import csv
@@ -35,7 +16,6 @@ import os
 import sys
 
 import duckdb
-
 
 NCITED = os.environ.get("NCITED", "data/_n_cited.csv")
 NMUTUAL = os.environ.get("NMUTUAL", "data/_n_mutual.csv")
@@ -59,7 +39,9 @@ def validate_metric_file(path, value_col):
             reader = csv.DictReader(f)
 
             expected_columns = {"id", value_col}
-            if not reader.fieldnames or not expected_columns.issubset(reader.fieldnames):
+            if not reader.fieldnames or not expected_columns.issubset(
+                reader.fieldnames
+            ):
                 print(
                     f"  FAIL: expected columns {expected_columns}, "
                     f"found {reader.fieldnames}"
@@ -110,7 +92,9 @@ def count_mutual_pairs(path):
             reader = csv.DictReader(f)
 
             expected_columns = {"paper_a", "paper_b"}
-            if not reader.fieldnames or not expected_columns.issubset(reader.fieldnames):
+            if not reader.fieldnames or not expected_columns.issubset(
+                reader.fieldnames
+            ):
                 print(
                     f"  FAIL: expected columns {expected_columns}, "
                     f"found {reader.fieldnames}"

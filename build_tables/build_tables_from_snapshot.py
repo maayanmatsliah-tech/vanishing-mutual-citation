@@ -1,43 +1,17 @@
 """
-Build attributes + edges tables directly from the OpenAlex data snapshot.
+Build attributes and edges tables by streaming the public OpenAlex snapshot from S3.
 
-The OpenAlex snapshot is the full works corpus as gzipped JSON-Lines on the public
-S3 bucket `s3://openalex` (no credentials needed). We stream it line by line and
-never store the snapshot itself. This avoids the API entirely (and its rate limits).
-
-Per work published in [START_YEAR, END_YEAR] we emit:
+Outputs:
   attributes: id, year, field, author
-      id     -> OpenAlex short id with the URL prefix stripped (e.g. W123)
-      year   -> publication_year
-      field  -> primary topic's field display name (topics[0].field.display_name)
-      author -> authorships[].author.display_name, joined with "; "
-  edges: source, targets
-      one row per paper (source = this paper); targets is a ";"-joined list of
-      all cited papers (referenced_works). Papers with no references are omitted.
-
-Sample mode (default): stop after SAMPLE_N attribute rows so you can eyeball the
-columns before committing to a full run. Set SAMPLE_N=0 for no limit.
-
-Resume: progress is checkpointed per part-file. If the run dies, just launch it
-again with the same outputs and it skips finished parts and continues. On resume
-the CSVs are truncated back to the last completed part's byte offsets, so a
-half-written part from a crash is discarded rather than duplicated.
+  edges:      source, semicolon-delimited cited target IDs
 
 Env:
-  SAMPLE_N    stop after this many attribute rows (default 100; 0 = unlimited)
-  START_YEAR  default 1975
-  END_YEAR    default 2025
-  ATTR_OUT    default data/sample_attributes.csv
-  EDGES_OUT   default data/sample_edges.csv
-  PROGRESS    checkpoint file (default data/.snapshot_progress.tsv)
-
-NOTE: there is NO work-type filter here, so OpenAlex non-paper records
-(datasets, author-profile "other", paratext, peer-review) are ingested; these
-lack a topic and end up as field='Unknown' (94% dated 2024/2025). The dataset
-is cleaned downstream by dropping field='Unknown' (see analysis/clean_dataset.py).
-A future re-ingest should filter on work `type` instead.
-
-Usage:  ./venv/bin/python analysis/build_tables_from_snapshot.py
+  SAMPLE_N    Max rows to process (default: 100; 0 = unlimited)
+  START_YEAR  Start publication year (default: 1975)
+  END_YEAR    End publication year (default: 2025)
+  ATTR_OUT    Output path for attributes CSV (default: data/sample_attributes.csv)
+  EDGES_OUT   Output path for edges CSV (default: data/sample_edges.csv)
+  PROGRESS    Checkpoint TSV file (default: data/.snapshot_progress.tsv)
 """
 
 import csv

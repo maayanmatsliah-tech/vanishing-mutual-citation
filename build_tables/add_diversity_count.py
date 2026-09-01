@@ -1,23 +1,17 @@
 """
-Add `diversity_count` to attributes.duckdb — Strategy B (streaming).
+Add diversity_count to the attributes table via streaming bitset aggregation.
 
-diversity_count = number of DISTINCT fields a paper cites OTHER papers on,
-excluding self-citations and not counting 'Unknown'. Papers that cite nothing,
-or only Unknown / only out-of-set papers, get 0.
+diversity_count: Number of distinct non-Unknown fields a paper cites (excluding self-citations).
 
-Why streaming: the only thing that must be resident is the id->field lookup
-(~4 GB); the 2.96B citations are streamed one source-row at a time from the
-adjacency CSV, so there is no large hash-join and no big disk spill.
+Outputs:
+  data/_div_counts.csv       Intermediate per-paper diversity counts
+  data/attributes_new.duckdb Attributes DuckDB with diversity_count column added
 
-  Phase 1  load sorted (id_int, field_code) into RAM from attributes.duckdb.
-           field_code: non-Unknown fields -> 0..N-1; Unknown -> -1.
-  Phase 2  stream edges.csv once; per source, look up each target's code via
-           binary search, drop self / out-of-set / Unknown, OR the surviving
-           field bits into one integer, popcount -> count. Write (id_int,count).
-  Phase 3  DuckDB rewrites attributes with the new column (LEFT JOIN counts,
-           default 0) into a fresh db file. Caller verifies + swaps it in.
-
-Fixed ~4-5 GB RAM; the heavy pass writes only a small counts CSV (no spill).
+Env:
+  SRC     Source attributes DuckDB (default: data/attributes.duckdb)
+  EDGES   Edges CSV (default: data/edges.csv)
+  COUNTS  Intermediate counts CSV path (default: data/_div_counts.csv)
+  NEW     New attributes DuckDB path (default: data/attributes_new.duckdb)
 """
 
 import csv
@@ -56,8 +50,11 @@ def phase1_lookup():
     order = np.argsort(ids, kind="stable")
     ids = ids[order]
     codes = codes[order]
-    print(f"  loaded {ids.shape[0]:,} papers; "
-          f"{int((codes >= 0).sum()):,} have a known (non-Unknown) field", flush=True)
+    print(
+        f"  loaded {ids.shape[0]:,} papers; "
+        f"{int((codes >= 0).sum()):,} have a known (non-Unknown) field",
+        flush=True,
+    )
     return ids, codes
 
 
@@ -81,7 +78,7 @@ def phase2_stream(ids, codes):
             if present.any():
                 pt = t[present]
                 pc = codes[idx[present]]
-                ck = pc[(pc >= 0) & (pt != src)]   # non-Unknown, non-self
+                ck = pc[(pc >= 0) & (pt != src)]  # non-Unknown, non-self
                 if ck.size:
                     mask = int(np.bitwise_or.reduce(one << ck.astype(np.int64)))
                     cnt = mask.bit_count()
@@ -114,8 +111,14 @@ def phase3_merge():
     """)
     con.execute("DETACH src")
     n = con.execute("SELECT count(*) FROM attributes").fetchone()[0]
-    print("rows:", f"{n:,}", "| expected", f"{EXPECT:,}", "|",
-          "OK" if n == EXPECT else "MISMATCH - DO NOT SWAP")
+    print(
+        "rows:",
+        f"{n:,}",
+        "| expected",
+        f"{EXPECT:,}",
+        "|",
+        "OK" if n == EXPECT else "MISMATCH - DO NOT SWAP",
+    )
     print("schema:", con.execute("DESCRIBE attributes").fetchall())
     print("diversity_count distribution (0..14):")
     for r in con.execute(

@@ -1,23 +1,17 @@
 """
-Mean mutual citations per paper by year.
-
-Uses the precomputed _n_cited.csv and _n_mutual.csv files.
-
-Cohort:
-  papers with n_cited >= 1.
-
-Per paper we need:
-  - year           (from attributes.duckdb)
-  - n_mutual       (from data/_n_mutual.csv)
-  - n_cited        (from data/_n_cited.csv; only used to define the cohort)
+Calculate and plot mean mutual citations per paper by publication year:
+  mean = sum(n_mutual) / count(papers) for papers with n_cited >= 1.
 
 Outputs:
   figures/csvs/mean_mutual_citations_per_year.csv
   figures/graphs/mean_mutual_citations_per_year.png
 
-Env: ATTR, NCITED, NMUTUAL, OUT_CSV, OUT_PNG, MEM (default 10GB),
-     MIN_PAPERS (drop a year with fewer papers than this; default 10000),
-     MIN_YEAR (default 1975), MAX_YEAR (default 2023).
+Env:
+  ATTR / NCITED / NMUTUAL  Input paths (default: data/attributes.duckdb, data/_n_cited.csv, data/_n_mutual.csv)
+  OUT_CSV / OUT_PNG        Output CSV and PNG plot paths
+  MEM                      DuckDB memory limit (default: 10GB)
+  MIN_PAPERS               Minimum papers per year to include (default: 10000)
+  MIN_YEAR / MAX_YEAR      Year range (default: 1975 to 2023)
 """
 
 import os
@@ -28,12 +22,8 @@ ATTR = os.environ.get("ATTR", "data/attributes.duckdb")
 NCITED = os.environ.get("NCITED", "data/_n_cited.csv")
 NMUTUAL = os.environ.get("NMUTUAL", "data/_n_mutual.csv")
 
-OUT_CSV = os.environ.get(
-    "OUT_CSV", "figures/csvs/mean_mutual_citations_per_year.csv"
-)
-OUT_PNG = os.environ.get(
-    "OUT_PNG", "figures/graphs/mean_mutual_citations_per_year.png"
-)
+OUT_CSV = os.environ.get("OUT_CSV", "figures/csvs/mean_mutual_citations_per_year.csv")
+OUT_PNG = os.environ.get("OUT_PNG", "figures/graphs/mean_mutual_citations_per_year.png")
 
 MEM = os.environ.get("MEM", "10GB")
 MIN_PAPERS = int(os.environ.get("MIN_PAPERS", "10000"))
@@ -143,8 +133,7 @@ def write_outputs(rows):
     ax.set_xlabel("Publication year")
     ax.set_ylabel("Mean mutual citations per paper")
     ax.set_title(
-        "Mean mutual citations per paper, by year\n"
-        "(papers citing >=1 work)"
+        "Mean mutual citations per paper, by year\n" "(papers citing >=1 work)"
     )
 
     ax.grid(True, alpha=0.3)
