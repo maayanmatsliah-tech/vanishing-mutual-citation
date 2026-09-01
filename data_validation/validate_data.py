@@ -81,7 +81,10 @@ def check_completeness():
         for k in list(sorted(missing))[:5]:
             print(f"        missing: {k}", flush=True)
     if extra:
-        print(f"        note: {len(extra):,} checkpointed keys not in bucket (stale)", flush=True)
+        print(
+            f"        note: {len(extra):,} checkpointed keys not in bucket (stale)",
+            flush=True,
+        )
 
 
 def main():
@@ -100,8 +103,10 @@ def main():
     # The robust, version-independent check: DuckDB (with ignore_errors) must
     # parse exactly as many rows as the authoritative csv reader. A malformed
     # row would be silently dropped here and the counts would diverge.
-    print("\n--- materialize a compact attributes table on disk (id, year, field) ---",
-          flush=True)
+    print(
+        "\n--- materialize a compact attributes table on disk (id, year, field) ---",
+        flush=True,
+    )
     print("\n--- building compact attributes table (on disk) ---", flush=True)
     con.execute(f"""
         CREATE OR REPLACE TABLE attr AS
@@ -113,18 +118,27 @@ def main():
     n_attr = con.execute("SELECT count(*) FROM attr").fetchone()[0]
 
     # ---- T1/T2 structural: parser agreement on attributes ----
-    record("PASS" if n_attr == EXPECT_ROWS else "FAIL", "structural[attributes]",
-           f"DuckDB parsed {n_attr:,} rows vs csv-reader {EXPECT_ROWS:,}")
+    record(
+        "PASS" if n_attr == EXPECT_ROWS else "FAIL",
+        "structural[attributes]",
+        f"DuckDB parsed {n_attr:,} rows vs csv-reader {EXPECT_ROWS:,}",
+    )
 
     # ---- T1 id validity ----
     bad_id = con.execute("SELECT count(*) FROM attr WHERE id IS NULL").fetchone()[0]
-    record("PASS" if bad_id == 0 else "FAIL", "id parse",
-           f"{bad_id:,} ids not parseable as W+digits")
+    record(
+        "PASS" if bad_id == 0 else "FAIL",
+        "id parse",
+        f"{bad_id:,} ids not parseable as W+digits",
+    )
 
     # ---- T1 id uniqueness (re-confirm in DuckDB) ----
     n_uid = con.execute("SELECT count(DISTINCT id) FROM attr").fetchone()[0]
-    record("PASS" if n_uid == n_attr else "FAIL", "id uniqueness",
-           f"{n_uid:,} distinct of {n_attr:,}")
+    record(
+        "PASS" if n_uid == n_attr else "FAIL",
+        "id uniqueness",
+        f"{n_uid:,} distinct of {n_attr:,}",
+    )
 
     # ---- T1 year validity ----
     ynull, ylo, yhi, ymin, ymax = con.execute(f"""
@@ -134,29 +148,35 @@ def main():
                min(year), max(year)
         FROM attr
     """).fetchone()
-    ok = (ynull == 0 and ylo == 0 and yhi == 0)
-    record("PASS" if ok else "FAIL", "year validity",
-           f"range [{ymin},{ymax}]; null={ynull:,} below={ylo:,} above={yhi:,}")
+    ok = ynull == 0 and ylo == 0 and yhi == 0
+    record(
+        "PASS" if ok else "FAIL",
+        "year validity",
+        f"range [{ymin},{ymax}]; null={ynull:,} below={ylo:,} above={yhi:,}",
+    )
 
     # ---- T2 field domain ----
     nfields, nfnull = con.execute(
         "SELECT count(DISTINCT field), count(*) FILTER (WHERE field IS NULL) FROM attr"
     ).fetchone()
-    unk = con.execute(
-        "SELECT count(*) FROM attr WHERE field = 'Unknown'"
-    ).fetchone()[0]
-    record("INFO", "field domain",
-           f"{nfields} distinct fields; Unknown={unk:,} ({unk/n_attr*100:.1f}%); "
-           f"null={nfnull:,}")
+    unk = con.execute("SELECT count(*) FROM attr WHERE field = 'Unknown'").fetchone()[0]
+    record(
+        "INFO",
+        "field domain",
+        f"{nfields} distinct fields; Unknown={unk:,} ({unk/n_attr*100:.1f}%); "
+        f"null={nfnull:,}",
+    )
 
     # ---- per-year distribution (info; spot a missing year) ----
     rows = con.execute(
         "SELECT year, count(*) FROM attr GROUP BY year ORDER BY year"
     ).fetchall()
-    empty_years = [y for y in range(START, END + 1)
-                   if y not in {r[0] for r in rows}]
-    record("PASS" if not empty_years else "WARN", "year coverage",
-           f"{len(rows)} distinct years; empty years: {empty_years or 'none'}")
+    empty_years = [y for y in range(START, END + 1) if y not in {r[0] for r in rows}]
+    record(
+        "PASS" if not empty_years else "WARN",
+        "year coverage",
+        f"{len(rows)} distinct years; empty years: {empty_years or 'none'}",
+    )
 
     # ---- edges views (no materialization; per-row list ops avoid the unnest) ----
     con.execute(f"""
@@ -180,14 +200,25 @@ def main():
             FROM edges_raw
         """).fetchone()
     )
-    record("PASS" if src_rows == EXPECT_EDGE_ROWS else "FAIL", "structural[edges]",
-           f"DuckDB parsed {src_rows:,} rows vs expected {EXPECT_EDGE_ROWS:,}")
-    record("PASS" if src_rows == dist_src else "FAIL", "source uniqueness",
-           f"{src_rows:,} rows, {dist_src:,} distinct sources")
+    record(
+        "PASS" if src_rows == EXPECT_EDGE_ROWS else "FAIL",
+        "structural[edges]",
+        f"DuckDB parsed {src_rows:,} rows vs expected {EXPECT_EDGE_ROWS:,}",
+    )
+    record(
+        "PASS" if src_rows == dist_src else "FAIL",
+        "source uniqueness",
+        f"{src_rows:,} rows, {dist_src:,} distinct sources",
+    )
     record("INFO", "total citations", f"{total_edges:,} directed edges")
-    record("INFO", "self-loops", f"{self_in_list:,} sources list themselves as a target")
-    record("INFO", "duplicate targets",
-           f"{dup_src_lists:,} sources have repeated target ids ({dup_tgt_inst:,} dup instances)")
+    record(
+        "INFO", "self-loops", f"{self_in_list:,} sources list themselves as a target"
+    )
+    record(
+        "INFO",
+        "duplicate targets",
+        f"{dup_src_lists:,} sources have repeated target ids ({dup_tgt_inst:,} dup instances)",
+    )
 
     # ---- T1 referential integrity: every source is a known paper ----
     print("\n--- T1 referential integrity (sources in attributes) ---", flush=True)
@@ -197,18 +228,26 @@ def main():
         ) e LEFT JOIN attr a ON a.id = e.s
         WHERE a.id IS NULL
     """).fetchone()[0]
-    record("PASS" if miss_src == 0 else "FAIL", "referential(sources)",
-           f"{miss_src:,} sources not present in attributes")
+    record(
+        "PASS" if miss_src == 0 else "FAIL",
+        "referential(sources)",
+        f"{miss_src:,} sources not present in attributes",
+    )
 
     # ---- T1 zero-citation cliff ----
     papers_with_edges = dist_src
     zero = n_attr - papers_with_edges
-    record("INFO", "zero-citation papers",
-           f"{zero:,} of {n_attr:,} papers ({zero/n_attr*100:.1f}%) have no outbound citations")
+    record(
+        "INFO",
+        "zero-citation papers",
+        f"{zero:,} of {n_attr:,} papers ({zero/n_attr*100:.1f}%) have no outbound citations",
+    )
 
     # ---- T1 target coverage (the heavy one: unnest ~2B + join to attr) ----
-    print("\n--- T1 target coverage (unnesting ~2B citations; this is the slow step) ---",
-          flush=True)
+    print(
+        "\n--- T1 target coverage (unnesting ~2B citations; this is the slow step) ---",
+        flush=True,
+    )
     total_t, parseable_t, known_t = con.execute("""
         WITH t AS (
             SELECT TRY_CAST(ltrim(unnest(string_split(targets, ';')), 'W') AS BIGINT) AS target
@@ -219,11 +258,17 @@ def main():
                count(*) FILTER (WHERE a.id IS NOT NULL)
         FROM t LEFT JOIN attr a ON a.id = t.target
     """).fetchone()
-    record("INFO", "target parse",
-           f"{total_t - parseable_t:,} of {total_t:,} target ids unparseable")
-    record("INFO", "target field coverage",
-           f"{known_t:,} of {total_t:,} citations ({known_t/total_t*100:.1f}%) "
-           f"point to a paper whose field we know")
+    record(
+        "INFO",
+        "target parse",
+        f"{total_t - parseable_t:,} of {total_t:,} target ids unparseable",
+    )
+    record(
+        "INFO",
+        "target field coverage",
+        f"{known_t:,} of {total_t:,} citations ({known_t/total_t*100:.1f}%) "
+        f"point to a paper whose field we know",
+    )
 
     # ---- summary ----
     print("\n================ SUMMARY ================", flush=True)

@@ -10,16 +10,17 @@ Does NOT overwrite attributes.duckdb. Emits:
 
 Env: SRC, EDGES, PRE, COUNTS, OUT_CMP, MEM.
 """
+
 import csv, os, sys, time
 import numpy as np
 import duckdb
 
-SRC     = os.environ.get("SRC", "data/attributes.duckdb")
-EDGES   = os.environ.get("EDGES", "data/edges.csv")
-PRE     = os.environ.get("PRE", "data/pre1975_fields/batch_*.parquet")
-COUNTS  = os.environ.get("COUNTS", "data/_div_backfilled_counts.csv")
+SRC = os.environ.get("SRC", "data/attributes.duckdb")
+EDGES = os.environ.get("EDGES", "data/edges.csv")
+PRE = os.environ.get("PRE", "data/pre1975_fields/batch_*.parquet")
+COUNTS = os.environ.get("COUNTS", "data/_div_backfilled_counts.csv")
 OUT_CMP = os.environ.get("OUT_CMP", "data/diversity_before_after_by_year.csv")
-MEM     = os.environ.get("MEM", "12GB")
+MEM = os.environ.get("MEM", "12GB")
 csv.field_size_limit(sys.maxsize)
 
 
@@ -50,12 +51,15 @@ def phase1():
         FROM read_parquet('{PRE}') pre JOIN fcode f ON f.field = pre.field
     """).fetchnumpy()
     con.close()
-    ids  = np.concatenate([a["id"],  p["id"]])
+    ids = np.concatenate([a["id"], p["id"]])
     code = np.concatenate([a["code"].astype(np.int16), p["code"].astype(np.int16)])
     order = np.argsort(ids, kind="stable")
     ids, code = ids[order], code[order]
-    print(f"  {n_fields} field codes; lookup = {ids.shape[0]:,} ids "
-          f"({a['id'].shape[0]:,} in-set + {p['id'].shape[0]:,} pre-1975)", flush=True)
+    print(
+        f"  {n_fields} field codes; lookup = {ids.shape[0]:,} ids "
+        f"({a['id'].shape[0]:,} in-set + {p['id'].shape[0]:,} pre-1975)",
+        flush=True,
+    )
     return ids, code
 
 
@@ -65,16 +69,21 @@ CHUNK = int(os.environ.get("CHUNK", "200000"))  # source rows per vectorized bat
 def _flush_chunk(srcs, tgt_str, ids, code, N, w):
     """Vectorized diversity for one batch of rows. srcs: list[int]; tgt_str:
     list[str] of ';'-joined 'W..' targets. Writes (src, distinct_field_count)."""
-    counts = np.fromiter((s.count(";") + 1 for s in tgt_str), dtype=np.int64,
-                         count=len(tgt_str))
+    counts = np.fromiter(
+        (s.count(";") + 1 for s in tgt_str), dtype=np.int64, count=len(tgt_str)
+    )
     S = np.fromiter(srcs, dtype=np.int64, count=len(srcs))
     # one parse of all targets in the batch: strip 'W', split on ';'
     T = np.fromstring(";".join(tgt_str).replace("W", ""), dtype=np.int64, sep=";")
-    idx = np.searchsorted(ids, T); np.clip(idx, 0, N - 1, out=idx)
+    idx = np.searchsorted(ids, T)
+    np.clip(idx, 0, N - 1, out=idx)
     codes = code[idx]
     valid = (ids[idx] == T) & (codes >= 0) & (T != np.repeat(S, counts))
-    bit = np.where(valid, np.int64(1) << np.where(codes >= 0, codes, 0).astype(np.int64),
-                   np.int64(0))
+    bit = np.where(
+        valid,
+        np.int64(1) << np.where(codes >= 0, codes, 0).astype(np.int64),
+        np.int64(0),
+    )
     starts = np.empty(counts.shape[0], dtype=np.int64)
     starts[0] = 0
     np.cumsum(counts[:-1], out=starts[1:])
@@ -90,18 +99,23 @@ def phase2(ids, code):
     n_src = 0
     t0 = time.perf_counter()
     with open(EDGES, newline="") as f, open(COUNTS, "w", newline="") as out:
-        r = csv.reader(f); w = csv.writer(out)
-        next(r); w.writerow(["id", "diversity_count"])
+        r = csv.reader(f)
+        w = csv.writer(out)
+        next(r)
+        w.writerow(["id", "diversity_count"])
         srcs, tgts = [], []
         for row in r:
-            srcs.append(int(row[0][1:])); tgts.append(row[1])
+            srcs.append(int(row[0][1:]))
+            tgts.append(row[1])
             if len(srcs) >= CHUNK:
                 _flush_chunk(srcs, tgts, ids, code, N, w)
-                n_src += len(srcs); srcs, tgts = [], []
+                n_src += len(srcs)
+                srcs, tgts = [], []
                 dt = time.perf_counter() - t0
                 print(f"  {n_src:,} sources ({dt:.0f}s, {n_src/dt:,.0f}/s)", flush=True)
         if srcs:
-            _flush_chunk(srcs, tgts, ids, code, N, w); n_src += len(srcs)
+            _flush_chunk(srcs, tgts, ids, code, N, w)
+            n_src += len(srcs)
     print(f"  done: {n_src:,} sources ({time.perf_counter()-t0:.0f}s)", flush=True)
 
 
@@ -135,8 +149,10 @@ def phase3():
         FROM cmp GROUP BY year ORDER BY year
     ) TO '{OUT_CMP}' (HEADER, DELIMITER ',')""")
     con.close()
-    print(f"\n{'year':>5} {'n_papers':>12} {'mean_old':>9} {'mean_new':>9} "
-          f"{'gain':>7} {'%raised':>8}")
+    print(
+        f"\n{'year':>5} {'n_papers':>12} {'mean_old':>9} {'mean_new':>9} "
+        f"{'gain':>7} {'%raised':>8}"
+    )
     for y, n, mo, mn, g, pr in rows:
         print(f"{y:>5} {n:>12,} {mo:>9.3f} {mn:>9.3f} {g:>7.3f} {pr:>7.1f}%")
     print(f"\nwrote {OUT_CMP}")

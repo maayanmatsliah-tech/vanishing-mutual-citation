@@ -63,7 +63,6 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 import pandas as pd
 
-
 ROOT = Path(__file__).resolve().parents[1]
 
 DB_PATH = ROOT / "data" / "attributes.duckdb"
@@ -137,19 +136,16 @@ def compute_share_and_rate():
             [str(NC_PATH), str(NM_PATH), MIN_YEAR, MAX_YEAR],
         )
 
-        con.execute(
-            """
+        con.execute("""
             CREATE TEMP TABLE papers AS
             SELECT * FROM in_window WHERE n_cited >= 3
-            """
-        )
+            """)
 
         # ------------------------------------------------------------------
         # 2. Count papers at every distinct n_cited value.
         # ------------------------------------------------------------------
 
-        con.execute(
-            """
+        con.execute("""
             CREATE TEMP TABLE value_counts AS
             SELECT
                 n_cited,
@@ -157,8 +153,7 @@ def compute_share_and_rate():
             FROM papers
             GROUP BY n_cited
             ORDER BY n_cited
-            """
-        )
+            """)
 
         # ------------------------------------------------------------------
         # 3. Assign value-based deciles.
@@ -175,8 +170,7 @@ def compute_share_and_rate():
         # No distinct n_cited value can ever be split.
         # ------------------------------------------------------------------
 
-        con.execute(
-            """
+        con.execute("""
             CREATE TEMP TABLE value_deciles AS
             WITH positioned AS (
                 SELECT
@@ -222,15 +216,13 @@ def compute_share_and_rate():
                     )
                 ) AS decile
             FROM midpoint
-            """
-        )
+            """)
 
         # ------------------------------------------------------------------
         # 4. Join the decile back to every paper.
         # ------------------------------------------------------------------
 
-        con.execute(
-            """
+        con.execute("""
             CREATE TEMP TABLE grouped AS
             SELECT
                 p.id,
@@ -247,15 +239,13 @@ def compute_share_and_rate():
             FROM papers p
             JOIN value_deciles d
               ON p.n_cited = d.n_cited
-            """
-        )
+            """)
 
         # ------------------------------------------------------------------
         # 5. Share of papers with any mutual citation.
         # ------------------------------------------------------------------
 
-        share = con.execute(
-            """
+        share = con.execute("""
             SELECT
                 decile,
                 group_name AS group,
@@ -278,8 +268,7 @@ def compute_share_and_rate():
             WHERE group_name IS NOT NULL
             GROUP BY decile, group_name
             ORDER BY decile, group_name
-            """
-        ).fetch_df()
+            """).fetch_df()
 
         # ------------------------------------------------------------------
         # 6. Mutual-citation rate.
@@ -290,8 +279,7 @@ def compute_share_and_rate():
         # This is NOT the mean of per-paper rates.
         # ------------------------------------------------------------------
 
-        rate = con.execute(
-            """
+        rate = con.execute("""
             SELECT
                 decile,
                 group_name AS group,
@@ -308,24 +296,19 @@ def compute_share_and_rate():
             WHERE group_name IS NOT NULL
             GROUP BY decile, group_name
             ORDER BY decile, group_name
-            """
-        ).fetch_df()
+            """).fetch_df()
 
         # ------------------------------------------------------------------
         # 7. Validation / diagnostics.
         # ------------------------------------------------------------------
 
-        n_total = con.execute(
-            "SELECT COUNT(*) FROM papers"
-        ).fetchone()[0]
+        n_total = con.execute("SELECT COUNT(*) FROM papers").fetchone()[0]
 
-        n_under_3 = con.execute(
-            """
+        n_under_3 = con.execute("""
             SELECT COUNT(*)
             FROM in_window
             WHERE n_cited < 3
-            """
-        ).fetchone()[0]
+            """).fetchone()[0]
 
         # Papers that would have entered the cohort but for the year bound.
         # Derived by subtraction rather than a second join: validate_data.py
@@ -345,17 +328,14 @@ def compute_share_and_rate():
         ).fetchone()[0]
         n_year_excluded = n_ge3_all_years - n_total
 
-        n_zero_diversity = con.execute(
-            """
+        n_zero_diversity = con.execute("""
             SELECT COUNT(*)
             FROM papers
             WHERE diversity_count = 0
-            """
-        ).fetchone()[0]
+            """).fetchone()[0]
 
         # Every n_cited value must map to exactly one decile.
-        n_split = con.execute(
-            """
+        n_split = con.execute("""
             SELECT COUNT(*)
             FROM (
                 SELECT
@@ -365,20 +345,17 @@ def compute_share_and_rate():
                 GROUP BY n_cited
                 HAVING COUNT(DISTINCT decile) > 1
             )
-            """
-        ).fetchone()[0]
+            """).fetchone()[0]
 
         # Overall paper count by decile, BEFORE diversity exclusion.
-        decile_sizes = con.execute(
-            """
+        decile_sizes = con.execute("""
             SELECT
                 decile,
                 COUNT(*) AS n_papers
             FROM grouped
             GROUP BY decile
             ORDER BY decile
-            """
-        ).fetchall()
+            """).fetchall()
 
     finally:
         con.close()
@@ -403,11 +380,7 @@ def compute_share_and_rate():
 
     for decile, n_papers in decile_sizes:
         pct = 100.0 * n_papers / n_total
-        print(
-            f"{decile:>8} "
-            f"{n_papers:>14,} "
-            f"{pct:>9.2f}%"
-        )
+        print(f"{decile:>8} " f"{n_papers:>14,} " f"{pct:>9.2f}%")
 
     return share, rate
 
@@ -442,9 +415,7 @@ def write_outputs(share: pd.DataFrame, rate: pd.DataFrame):
     ax.set_xlim(0.5, 10.5)
     ax.set_xticks(range(1, 11))
     ax.set_xlabel("Reference-count decile")
-    ax.set_ylabel(
-        "Share of papers with any mutual citation (%)"
-    )
+    ax.set_ylabel("Share of papers with any mutual citation (%)")
     ax.set_title(
         "Share of papers with any mutual citation "
         "by reference-count decile\n"
@@ -477,12 +448,9 @@ def write_outputs(share: pd.DataFrame, rate: pd.DataFrame):
     ax.set_xlim(0.5, 10.5)
     ax.set_xticks(range(1, 11))
     ax.set_xlabel("Reference-count decile")
-    ax.set_ylabel(
-        "Mutual-citation rate (% of references reciprocated)"
-    )
+    ax.set_ylabel("Mutual-citation rate (% of references reciprocated)")
     ax.set_title(
-        "Mutual-citation rate by reference-count decile\n"
-        "(papers citing 3+ papers)"
+        "Mutual-citation rate by reference-count decile\n" "(papers citing 3+ papers)"
     )
     ax.grid(True, linestyle="--", alpha=0.4)
     ax.legend(title="Group")

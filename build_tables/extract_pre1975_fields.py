@@ -16,25 +16,31 @@ readable downstream as a glob 'data/pre1975_fields/batch_*.parquet'.
 Env: OUTDIR (default data/pre1975_fields), MEM (10GB), MAXYEAR (1975),
      BATCH (parts per batch, default 25), RETRIES (per batch, default 15).
 """
+
 import os, time, json
 import boto3
 from botocore import UNSIGNED
 from botocore.config import Config
 import duckdb
 
-OUTDIR   = os.environ.get("OUTDIR", "data/pre1975_fields")
-MEM      = os.environ.get("MEM", "10GB")
-MAXYEAR  = int(os.environ.get("MAXYEAR", "1975"))
-BATCH    = int(os.environ.get("BATCH", "25"))
-RETRIES  = int(os.environ.get("RETRIES", "15"))
+OUTDIR = os.environ.get("OUTDIR", "data/pre1975_fields")
+MEM = os.environ.get("MEM", "10GB")
+MAXYEAR = int(os.environ.get("MAXYEAR", "1975"))
+BATCH = int(os.environ.get("BATCH", "25"))
+RETRIES = int(os.environ.get("RETRIES", "15"))
 DONEFILE = os.path.join(OUTDIR, ".done")
 
 
 def part_urls():
-    s3 = boto3.client("s3", config=Config(signature_version=UNSIGNED,
-                                           connect_timeout=30, read_timeout=120))
-    m = json.loads(s3.get_object(Bucket="openalex",
-                   Key="data/parquet/works/manifest.json")["Body"].read())
+    s3 = boto3.client(
+        "s3",
+        config=Config(signature_version=UNSIGNED, connect_timeout=30, read_timeout=120),
+    )
+    m = json.loads(
+        s3.get_object(Bucket="openalex", Key="data/parquet/works/manifest.json")[
+            "Body"
+        ].read()
+    )
     return [e["url"] for e in m["files"]]
 
 
@@ -56,12 +62,15 @@ def main():
     os.makedirs(OUTDIR, exist_ok=True)
     os.makedirs("data/_duckdb_tmp", exist_ok=True)
     urls = part_urls()
-    batches = [urls[i:i + BATCH] for i in range(0, len(urls), BATCH)]
+    batches = [urls[i : i + BATCH] for i in range(0, len(urls), BATCH)]
     done = set()
     if os.path.exists(DONEFILE):
         with open(DONEFILE) as f:
             done = {int(x) for x in f.read().split()}
-    print(f"{len(urls)} parts -> {len(batches)} batches; {len(done)} already done", flush=True)
+    print(
+        f"{len(urls)} parts -> {len(batches)} batches; {len(done)} already done",
+        flush=True,
+    )
 
     con = new_con()
     t0 = time.perf_counter()
@@ -84,16 +93,24 @@ def main():
                 with open(DONEFILE, "a") as f:
                     f.write(f"{bi}\n")
                 done.add(bi)
-                print(f"  batch {bi+1}/{len(batches)} ok  "
-                      f"({time.perf_counter()-t0:.0f}s elapsed)", flush=True)
+                print(
+                    f"  batch {bi+1}/{len(batches)} ok  "
+                    f"({time.perf_counter()-t0:.0f}s elapsed)",
+                    flush=True,
+                )
                 break
             except Exception as ex:
                 if attempt == RETRIES:
-                    print(f"  batch {bi} FAILED after {RETRIES} tries: {ex}", flush=True)
+                    print(
+                        f"  batch {bi} FAILED after {RETRIES} tries: {ex}", flush=True
+                    )
                     raise
-                wait = min(60, 2 ** attempt)
-                print(f"  batch {bi} {type(ex).__name__} (try {attempt}/{RETRIES}); "
-                      f"reconnect+retry in {wait}s", flush=True)
+                wait = min(60, 2**attempt)
+                print(
+                    f"  batch {bi} {type(ex).__name__} (try {attempt}/{RETRIES}); "
+                    f"reconnect+retry in {wait}s",
+                    flush=True,
+                )
                 # a failed COPY may leave a partial file; drop it before retry
                 try:
                     if os.path.exists(out):
@@ -108,9 +125,13 @@ def main():
                 con = new_con()
 
     n = con.execute(
-        f"SELECT count(*) FROM read_parquet('{OUTDIR}/batch_*.parquet')").fetchone()[0]
-    print(f"\nDONE: {n:,} pre-{MAXYEAR} id->field rows  "
-          f"({time.perf_counter()-t0:.0f}s)", flush=True)
+        f"SELECT count(*) FROM read_parquet('{OUTDIR}/batch_*.parquet')"
+    ).fetchone()[0]
+    print(
+        f"\nDONE: {n:,} pre-{MAXYEAR} id->field rows  "
+        f"({time.perf_counter()-t0:.0f}s)",
+        flush=True,
+    )
     print("field distribution (top 12):", flush=True)
     for r in con.execute(f"""SELECT field, count(*) c
                              FROM read_parquet('{OUTDIR}/batch_*.parquet')

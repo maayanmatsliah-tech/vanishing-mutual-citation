@@ -7,13 +7,14 @@ attributes.duckdb is left untouched.
   COUNTS   repaired per-paper counts (default data/_div_backfilled_counts.csv)
   NEW      output db                (default data/attributes_backfilled.duckdb)
 """
+
 import os, time
 import duckdb
 
-SRC    = os.environ.get("SRC", "data/attributes.duckdb")
+SRC = os.environ.get("SRC", "data/attributes.duckdb")
 COUNTS = os.environ.get("COUNTS", "data/_div_backfilled_counts.csv")
-NEW    = os.environ.get("NEW", "data/attributes_backfilled.duckdb")
-MEM    = os.environ.get("MEM", "12GB")
+NEW = os.environ.get("NEW", "data/attributes_backfilled.duckdb")
+MEM = os.environ.get("MEM", "12GB")
 
 
 def main():
@@ -38,10 +39,12 @@ def main():
           ON d.id = CAST(ltrim(a.id,'W') AS BIGINT)
     """)
     con.execute("DETACH src")
-    n  = con.execute("SELECT count(*) FROM attributes").fetchone()[0]
+    n = con.execute("SELECT count(*) FROM attributes").fetchone()[0]
     av = con.execute("SELECT avg(diversity_count) FROM attributes").fetchone()[0]
     mx = con.execute("SELECT max(diversity_count) FROM attributes").fetchone()[0]
-    print(f"rows={n:,}  mean_diversity={av:.3f}  max={mx}  ({time.perf_counter()-t0:.0f}s)")
+    print(
+        f"rows={n:,}  mean_diversity={av:.3f}  max={mx}  ({time.perf_counter()-t0:.0f}s)"
+    )
     con.close()
 
 

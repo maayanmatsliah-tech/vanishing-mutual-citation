@@ -24,7 +24,6 @@ import os
 
 import duckdb
 
-
 ATTR = os.environ.get("ATTR", "data/attributes.duckdb")
 OUT = os.environ.get(
     "OUT",
@@ -49,8 +48,7 @@ def compute():
             flush=True,
         )
 
-        rows = con.execute(
-            f"""
+        rows = con.execute(f"""
             SELECT
                 year,
                 COUNT(*) AS n_papers
@@ -58,8 +56,7 @@ def compute():
             WHERE year BETWEEN {START} AND {END}
             GROUP BY year
             ORDER BY year
-            """
-        ).fetchall()
+            """).fetchall()
 
     finally:
         con.close()

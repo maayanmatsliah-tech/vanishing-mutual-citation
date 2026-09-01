@@ -49,7 +49,9 @@ def main():
     print(f"     distinct cited (incl out-of-set): {n_cited:,}", flush=True)
 
     print("3/3 connected = sources UNION cited ...", flush=True)
-    con.execute("CREATE TABLE connected AS SELECT id FROM sources UNION SELECT id FROM cited")
+    con.execute(
+        "CREATE TABLE connected AS SELECT id FROM sources UNION SELECT id FROM cited"
+    )
     n_conn = con.execute("SELECT count(*) FROM connected").fetchone()[0]
     print(f"     connected ids (incl out-of-set): {n_conn:,}", flush=True)
 
