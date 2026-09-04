@@ -8,7 +8,7 @@ Outputs:
 Env:
   SAMPLE_N    Max rows to process (default: 100; 0 = unlimited)
   START_YEAR  Start publication year (default: 1975)
-  END_YEAR    End publication year (default: 2025)
+  END_YEAR    End publication year (default: 2023)
   ATTR_OUT    Output path for attributes CSV (default: data/sample_attributes.csv)
   EDGES_OUT   Output path for edges CSV (default: data/sample_edges.csv)
   PROGRESS    Checkpoint TSV file (default: data/.snapshot_progress.tsv)
@@ -32,7 +32,7 @@ WORKS_PREFIX = "data/works/"
 
 SAMPLE_N = int(os.environ.get("SAMPLE_N", "100"))
 START_YEAR = int(os.environ.get("START_YEAR", "1975"))
-END_YEAR = int(os.environ.get("END_YEAR", "2025"))
+END_YEAR = int(os.environ.get("END_YEAR", "2023"))
 ATTR_OUT = os.environ.get("ATTR_OUT", "data/sample_attributes.csv")
 EDGES_OUT = os.environ.get("EDGES_OUT", "data/sample_edges.csv")
 PROGRESS = os.environ.get("PROGRESS", "data/.snapshot_progress.tsv")
